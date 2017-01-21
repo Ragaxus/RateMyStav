@@ -1,0 +1,13 @@
+doctype html
+html
+	head
+		title= title
+		link(rel='stylesheet', href='/stylesheets/style.css')
+		script(src='javascripts/jquery-3.1.1.min.js')
+		script(src='javascripts/ratemystav_client.js')
+	body
+		h1= title
+		img#stav(height=500,width=500)
+		div#divCtrls
+			input#vote(type="button",value="New image")
+
