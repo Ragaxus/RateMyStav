@@ -15,6 +15,7 @@ console.log("__dirname = " + __dirname);
 
 //MongoDB
 var MongoClient = require('mongodb').MongoClient;
+var ObjectID = require('mongodb').ObjectID;
 var dbImgs;
 
 // Connect to the db
@@ -23,11 +24,16 @@ MongoClient.connect("mongodb://localhost:27017/stavs", function(err, newDB) {
 		console.log("We are connected");
 		dbImgs = newDB.collection("images");
 		dbImgs.recordVote = function(imgID,vote) {
-			var img = this.findOne({"_id": imgID},{avgRating: 1, N: {$size:
-				"$votes"}});
-			var N = img.N;
-			var newAvgRating = (N*img.avgRating + vote.rating)/(N+1.0);
-			this.images.update({"_id": imgID},{avgRating: newAvgRating, $push:{"votes":vote}});
+			this.aggregate([
+					{$match:{"_id":new ObjectID(imgID)}},
+					{$project:{avgRating:1,N:{$size:"$votes"}}}
+			]).next(function(err,img) {
+				console.log(JSON.stringify(img));
+				var N = img.N;
+				var newAvgRating = (N*img.avgRating + parseInt(vote.rating))/(N+1.0);
+				dbImgs.update({"_id":new ObjectID(imgID)},{"$set":{avgRating:
+					newAvgRating},"$push":{"votes":vote}});
+			});
 		};
 	}
 	else console.log(err);
@@ -59,23 +65,37 @@ app.use('/users', users);
 
 app.ws('/stav_channel', function(ws, req) {
 	ws.on('message', function(msg) {
-		if (msg.command = "getImage") {
-			dbImgs.aggregate([{$sample: {size: 1}},{$project:{"path":1}}], 
-				function(err,aggr){
-					var filPath =
-						'./data/images/'+aggr[0].path;
-					var ext = path.extname(filPath);
-					var res = {};
-					base64.encode(filPath,{string: true, local:
-						true},function(err,result){
-						res.img = "data:image/" + ext + ";base64," + result;
-						ws.send(JSON.stringify(res));
-						});
-				});
-		};
+		var msgObj = JSON.parse(msg);
+		switch (msgObj.command) {
+			case "getImage":
+				sendImage(ws);
+				break;
+			case "castVote":
+				console.log("received id from client: " + msgObj.id);
+				dbImgs.recordVote(msgObj.id,msgObj.vote);
+				sendImage(ws);
+				break;
+		}
 	});
 });
 
+var sendImage = function(ws){ 
+	dbImgs.aggregate([{$sample: {size: 1}},{$project:{"path":1}}], 
+			function(err,results){
+				var aggr=results[0];
+				var filPath =
+					'./data/images/'+aggr.path;
+				var ext = path.extname(filPath);
+				base64.encode(filPath,{string: true, local:
+					true},function(err,result){
+						var res = {};
+						res.img = "data:image/" + ext + ";base64," + result;
+						res.id = aggr._id.toString();
+						console.log("Sending out id of "+res.id);
+						ws.send(JSON.stringify(res));
+					});
+			});
+};
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {

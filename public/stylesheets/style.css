@@ -6,3 +6,27 @@ body {
 a {
   color: #00B7FF;
 }
+
+img#stav {
+	max-width: 100%;
+	max-height: 100%;
+}
+
+div#divStav {
+	width: 500px;
+	height: 500px;
+}
+
+
+#divRating {
+	unicode-bidi: bidi-override;
+	direction: rtl;
+	width: 100px;
+}
+
+#divRating > span:hover:before,
+#divRating > span:hover ~ span:before {
+  content: "\2605";
+  position: absolute;
+}
+
